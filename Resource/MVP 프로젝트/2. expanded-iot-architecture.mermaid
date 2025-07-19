@@ -1,0 +1,135 @@
+graph TB
+    %% Edge Devices
+    subgraph "Edge Computing Layer"
+        subgraph "AI Speaker Hub"
+            A1[Audio Processing<br/>- Edge TPU<br/>- 로컬 STT/TTS]
+            A2[Local AI Engine<br/>- TensorFlow Lite<br/>- 오프라인 처리]
+            A3[Device Controller<br/>- Matter/Thread<br/>- 로컬 제어]
+        end
+        
+        subgraph "IoT Devices"
+            B1[Smart Lights<br/>- Zigbee/WiFi]
+            B2[Smart Thermostat<br/>- Z-Wave]
+            B3[Security Cameras<br/>- RTSP/ONVIF]
+            B4[Smart Appliances<br/>- WiFi/BLE]
+        end
+    end
+
+    %% Message Layer
+    subgraph "Message & Stream Layer"
+        C1[Apache Kafka<br/>- 이벤트 스트리밍<br/>- 대용량 처리]
+        C2[MQTT Broker<br/>- Mosquitto<br/>- 디바이스 통신]
+        C3[WebRTC Server<br/>- 실시간 음성<br/>- P2P 통신]
+    end
+
+    %% Microservices
+    subgraph "Core Microservices (K8s)"
+        D1[API Gateway<br/>- Kong/Envoy<br/>- 로드밸런싱]
+        D2[User Service<br/>- Spring Boot<br/>- 인증/프로필]
+        D3[Device Registry<br/>- Spring Boot<br/>- 디바이스 관리]
+        D4[Dialog Orchestrator<br/>- Spring Boot<br/>- 대화 조율]
+        D5[Context Service<br/>- Spring Boot<br/>- 상황 인식]
+        D6[Automation Engine<br/>- Node-RED<br/>- 자동화 규칙]
+    end
+
+    %% Plugin Ecosystem
+    subgraph "Plugin Ecosystem"
+        E1[Weather Service<br/>- 자체 구현<br/>- ML 예측]
+        E2[Calendar Service<br/>- CalDAV<br/>- 일정 관리]
+        E3[Health Service<br/>- HealthKit API<br/>- 건강 모니터링]
+        E4[Entertainment<br/>- Spotify/Netflix<br/>- 미디어 제어]
+        E5[Smart Home<br/>- HomeAssistant<br/>- 통합 제어]
+        E6[Custom Plugins<br/>- Plugin SDK<br/>- 3rd Party]
+    end
+
+    %% AI/ML Platform
+    subgraph "AI/ML Platform"
+        F1[Model Registry<br/>- MLflow<br/>- 모델 버전 관리]
+        F2[Training Pipeline<br/>- Kubeflow<br/>- 모델 학습]
+        F3[Inference Service<br/>- TensorFlow Serving<br/>- 실시간 추론]
+        F4[NLU Engine<br/>- Rasa/BERT<br/>- 자연어 이해]
+        F5[Personalization<br/>- 추천 시스템<br/>- 개인화 학습]
+    end
+
+    %% Data Layer
+    subgraph "Data Infrastructure"
+        G1[(PostgreSQL<br/>- 사용자/디바이스<br/>- 트랜잭션)]
+        G2[(MongoDB<br/>- 대화/로그<br/>- 비정형 데이터)]
+        G3[(InfluxDB<br/>- 센서 데이터<br/>- 시계열)]
+        G4[(Redis Cluster<br/>- 캐시/세션<br/>- 실시간)]
+        G5[(S3 Storage<br/>- 음성/미디어<br/>- 오브젝트)]
+    end
+
+    %% Analytics
+    subgraph "Analytics & Monitoring"
+        H1[ELK Stack<br/>- 로그 분석<br/>- 검색/시각화]
+        H2[Prometheus<br/>- 메트릭 수집<br/>- 알림]
+        H3[Grafana<br/>- 대시보드<br/>- 모니터링]
+        H4[Analytics Engine<br/>- Apache Spark<br/>- 빅데이터 분석]
+    end
+
+    %% Connections
+    A1 -->|"로컬 처리"| A2
+    A2 -->|"디바이스 제어"| A3
+    A3 -->|"Matter/Thread"| B1
+    A3 -->|"Z-Wave"| B2
+    A3 -->|"RTSP"| B3
+    A3 -->|"WiFi/BLE"| B4
+    
+    A1 -->|"스트림 데이터"| C3
+    A2 -->|"이벤트"| C2
+    C2 -->|"MQTT→Kafka"| C1
+    C3 -->|"음성 스트림"| D1
+    
+    C1 ==>|"이벤트 스트림"| D4
+    C1 ==>|"이벤트 스트림"| D5
+    C1 ==>|"이벤트 스트림"| D6
+    
+    D1 -->|"API 라우팅"| D2
+    D1 -->|"API 라우팅"| D3
+    D1 -->|"API 라우팅"| D4
+    
+    D4 -->|"플러그인 호출"| E1
+    D4 -->|"플러그인 호출"| E2
+    D4 -->|"플러그인 호출"| E3
+    D4 -->|"플러그인 호출"| E4
+    D4 -->|"플러그인 호출"| E5
+    D4 -->|"플러그인 호출"| E6
+    
+    D4 -->|"AI 요청"| F4
+    D5 -->|"개인화 요청"| F5
+    F4 -->|"모델 로드"| F1
+    F5 -->|"추론 요청"| F3
+    
+    D2 -->|"사용자 데이터"| G1
+    D3 -->|"디바이스 정보"| G1
+    D4 -->|"대화 저장"| G2
+    A2 -->|"센서 데이터"| G3
+    D5 -->|"캐싱"| G4
+    C3 -->|"음성 저장"| G5
+    
+    C1 -.->|"로그 스트림"| H1
+    D1 -.->|"메트릭"| H2
+    H2 -.->|"시각화"| H3
+    G3 -.->|"분석"| H4
+    
+    %% Feedback loops
+    H4 -.->|"인사이트"| F2
+    F2 -.->|"새 모델"| F1
+
+    %% Styling
+    classDef edge fill:#e3f2fd,stroke:#1565c0,stroke-width:2px
+    classDef message fill:#fce4ec,stroke:#c2185b,stroke-width:2px
+    classDef service fill:#fff8e1,stroke:#f57c00,stroke-width:2px
+    classDef plugin fill:#f1f8e9,stroke:#689f38,stroke-width:2px
+    classDef ai fill:#ede7f6,stroke:#5e35b1,stroke-width:2px
+    classDef data fill:#e0f2f1,stroke:#00695c,stroke-width:2px
+    classDef analytics fill:#fbe9e7,stroke:#d84315,stroke-width:2px
+    
+    class A1,A2,A3,B1,B2,B3,B4 edge
+    class C1,C2,C3 message
+    class D1,D2,D3,D4,D5,D6 service
+    class E1,E2,E3,E4,E5,E6 plugin
+    class F1,F2,F3,F4,F5 ai
+    class G1,G2,G3,G4,G5 data
+    class H1,H2,H3,H4 analytics

@@ -1,0 +1,46 @@
+graph TB
+    subgraph "Plugin System Architecture"
+        A[User Input<br/>"오늘 날씨 어때?"] -->|1. 의도 분석| B[Intent Analyzer<br/>intent: weather.query]
+        B -->|2. 플러그인 매칭| C[Plugin Registry<br/>등록된 플러그인 검색]
+        
+        subgraph "Plugin Registry"
+            D[Weather Plugin<br/>intents: weather.*]
+            E[Calendar Plugin<br/>intents: calendar.*]
+            F[IoT Control Plugin<br/>intents: device.*]
+            G[Custom Plugin<br/>intents: custom.*]
+        end
+        
+        C -->|3. 플러그인 선택| D
+        D -->|4. 실행| H[Plugin Executor<br/>컨텍스트 주입]
+        
+        subgraph "Plugin Lifecycle"
+            I[validate()<br/>입력 검증]
+            J[preProcess()<br/>전처리]
+            K[execute()<br/>핵심 로직]
+            L[postProcess()<br/>후처리]
+        end
+        
+        H --> I --> J --> K --> L
+        
+        L -->|5. 응답 생성| M[Response Builder<br/>"오늘은 맑고 23도예요"]
+        
+        N[(Plugin Store<br/>플러그인 메타데이터)] -.->|동적 로드| C
+        O[Plugin SDK<br/>개발 도구] -->|플러그인 생성| G
+    end
+
+    %% Plugin Development Flow
+    subgraph "Plugin Development"
+        P[Plugin Interface<br/>구현] --> Q[Annotation<br/>@Plugin 설정]
+        Q --> R[JAR 패키징]
+        R --> S[Plugin Store<br/>업로드]
+        S --> T[자동 배포]
+    end
+
+    T -.->|런타임 로드| C
+
+    style A fill:#e3f2fd
+    style M fill:#c8e6c9
+    style D fill:#fff9c4
+    style E fill:#fff9c4
+    style F fill:#fff9c4
+    style G fill:#ffccbc

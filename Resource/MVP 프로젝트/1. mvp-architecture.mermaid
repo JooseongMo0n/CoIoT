@@ -1,0 +1,71 @@
+graph TB
+    %% Device Layer
+    subgraph "Device Layer (라즈베리파이)"
+        A[Audio Input/Output<br/>- Python pyaudio<br/>- 음성 수집/재생]
+        B[Wake Word Detection<br/>- Porcupine<br/>- 로컬 트리거]
+        C[MQTT Client<br/>- Paho MQTT<br/>- 이벤트 전송]
+        D[Motion Sensor<br/>- GPIO 제어<br/>- 움직임 감지]
+    end
+
+    %% Cloud Backend
+    subgraph "Backend Services (Spring Boot)"
+        E[API Gateway<br/>- Spring Cloud Gateway<br/>- 인증/라우팅]
+        F[Dialog Manager<br/>- Spring Boot<br/>- 대화 흐름 제어]
+        G[Context Engine<br/>- Spring Boot + Redis<br/>- 상태 관리]
+        H[Plugin Manager<br/>- Spring Plugin<br/>- 플러그인 실행]
+        
+        subgraph "Core Plugins"
+            I[Weather Plugin<br/>- OpenWeather API<br/>- 날씨 정보]
+            J[Time Plugin<br/>- Java Time API<br/>- 시간/일정]
+            K[Greeting Plugin<br/>- 규칙 기반<br/>- 인사/안부]
+        end
+        
+        L[(MongoDB<br/>- 대화 히스토리<br/>- 사용자 프로필)]
+        M[(Redis<br/>- 세션 상태<br/>- 실시간 컨텍스트)]
+    end
+
+    %% AI Services
+    subgraph "AI/ML Services"
+        N[Google STT<br/>- Speech to Text<br/>- 음성→텍스트]
+        O[Dialogflow<br/>- Intent/Entity<br/>- 의도 파악]
+        P[Google TTS<br/>- Text to Speech<br/>- 텍스트→음성]
+    end
+
+    %% Event Bus
+    Q[Event Bus<br/>- Redis Pub/Sub<br/>- 비동기 통신]
+
+    %% Connections with labels
+    A -->|"음성 스트림<br/>(PCM 16kHz)"| B
+    B -->|"Wake Word 감지"| C
+    D -->|"움직임 이벤트"| C
+    C -->|"MQTT<br/>(JSON)"| E
+    E -->|"HTTP/WebSocket"| F
+    F -->|"의도 분석 요청"| O
+    O -->|"Intent/Entity"| F
+    F -->|"컨텍스트 조회"| G
+    G -->|"상태 정보"| M
+    F -->|"플러그인 실행"| H
+    H -->|"기능 호출"| I
+    H -->|"기능 호출"| J
+    H -->|"기능 호출"| K
+    F -->|"대화 저장"| L
+    
+    A -->|"음성 데이터"| N
+    N -->|"텍스트 결과"| F
+    F -->|"응답 텍스트"| P
+    P -->|"음성 데이터"| A
+    
+    F -.->|"이벤트 발행"| Q
+    G -.->|"이벤트 구독"| Q
+    H -.->|"이벤트 구독"| Q
+
+    %% Styling
+    classDef device fill:#e1f5fe,stroke:#01579b,stroke-width:2px
+    classDef backend fill:#fff3e0,stroke:#e65100,stroke-width:2px
+    classDef ai fill:#f3e5f5,stroke:#4a148c,stroke-width:2px
+    classDef storage fill:#e8f5e9,stroke:#1b5e20,stroke-width:2px
+    
+    class A,B,C,D device
+    class E,F,G,H,I,J,K backend
+    class N,O,P ai
+    class L,M storage
