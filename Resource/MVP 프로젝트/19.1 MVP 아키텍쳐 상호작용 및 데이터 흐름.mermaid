@@ -1,0 +1,71 @@
+graph TB
+    %% 사용자 음성 입력 시나리오
+    subgraph "1. 음성 입력 처리"
+        User[사용자: '오늘 날씨 어때?'] -->|음성| RPi_Mic[라즈베리파이<br/>Microphone.py]
+        RPi_Mic -->|PCM 16kHz| WakeWord[WakeWordDetector.py<br/>Porcupine]
+        WakeWord -->|트리거 감지| AudioRec[AudioRecorder<br/>5초 녹음]
+        AudioRec -->|numpy array| AudioProc[AudioProcessor<br/>노이즈 제거]
+    end
+    
+    subgraph "2. 서버 전송"
+        AudioProc -->|base64 인코딩| MqttPub[MqttClient.py<br/>publish()]
+        MqttPub -->|MQTT<br/>device/audio| MqttBroker[Mosquitto<br/>Message Broker]
+        MqttBroker -->|구독| MqttHandler[DeviceMessageHandler.java<br/>@ServiceActivator]
+    end
+    
+    subgraph "3. Dialog 처리"
+        MqttHandler -->|AudioData| DialogCtrl[DialogController.java<br/>processAudio()]
+        DialogCtrl -->|byte[]| STT[GoogleSTTService.java<br/>transcribe()]
+        STT -->|"오늘 날씨 어때?"| DialogMgr[DialogManager.java<br/>processUserInput()]
+        
+        DialogMgr -->|userId, sessionId| CtxEngine[ContextEngine.java<br/>getOrCreateContext()]
+        CtxEngine -->|Redis 조회| RedisCache[(Redis<br/>context:user123:session456)]
+        RedisCache -->|Context 없음| MongoDB[(MongoDB<br/>contexts collection)]
+        MongoDB -->|새 Context 생성| CtxEngine
+        
+        DialogMgr -->|text + context| NLU[DialogflowService.java<br/>analyzeIntent()]
+        NLU -->|Intent{weather.query}<br/>Entities{date:today}| DialogMgr
+    end
+    
+    subgraph "4. Plugin 실행"
+        DialogMgr -->|Intent| PluginMgr[PluginManager.java<br/>selectPlugin()]
+        PluginMgr -->|조회| PluginReg[Plugin Registry<br/>Map<String, Plugin>]
+        PluginReg -->|WeatherPlugin 선택| PluginMgr
+        
+        PluginMgr -->|execute()| WeatherPlugin[WeatherPlugin.java<br/>execute()]
+        WeatherPlugin -->|location 추출| Context[Context<br/>userProfile.location]
+        WeatherPlugin -->|캐시 확인| WeatherCache[(Redis<br/>weather:seoul)]
+        
+        WeatherCache -->|Cache Miss| WeatherAPI[OpenWeatherMap API<br/>HTTP GET]
+        WeatherAPI -->|JSON Response| WeatherPlugin
+        WeatherPlugin -->|캐시 저장| WeatherCache
+        
+        WeatherPlugin -->|PluginResponse| DialogMgr
+    end
+    
+    subgraph "5. 응답 생성"
+        DialogMgr -->|응답 텍스트| TTS[GoogleTTSService.java<br/>synthesize()]
+        TTS -->|MP3 audio| DialogCtrl
+        DialogCtrl -->|AudioResponse| MqttHandler
+        MqttHandler -->|publish| MqttResp[MQTT<br/>device/response]
+        MqttResp -->|구독| RPiClient[MqttClient.py<br/>on_message()]
+        RPiClient -->|audio data| Speaker[Speaker.py<br/>play_audio()]
+        Speaker -->|음성 출력| User2[사용자: 듣기]
+    end
+    
+    %% 비동기 작업
+    DialogMgr -.->|비동기| SaveHistory[MongoDB<br/>대화 기록 저장]
+    DialogMgr -.->|이벤트| KafkaEvent[Kafka<br/>dialog-events]
+    
+    %% 스타일링
+    classDef userNode fill:#e1f5fe,stroke:#01579b,stroke-width:3px
+    classDef rpiNode fill:#fff3e0,stroke:#e65100,stroke-width:2px
+    classDef javaNode fill:#e8f5e9,stroke:#2e7d32,stroke-width:2px
+    classDef dbNode fill:#fce4ec,stroke:#c2185b,stroke-width:2px
+    classDef apiNode fill:#f3e5f5,stroke:#6a1b9a,stroke-width:2px
+    
+    class User,User2 userNode
+    class RPi_Mic,WakeWord,AudioRec,AudioProc,MqttPub,RPiClient,Speaker rpiNode
+    class MqttHandler,DialogCtrl,DialogMgr,CtxEngine,NLU,PluginMgr,WeatherPlugin javaNode
+    class RedisCache,MongoDB,WeatherCache,SaveHistory dbNode
+    class STT,TTS,WeatherAPI apiNode

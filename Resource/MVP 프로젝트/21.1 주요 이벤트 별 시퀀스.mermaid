@@ -1,0 +1,144 @@
+sequenceDiagram
+    participant U as 사용자
+    participant RPi as 라즈베리파이
+    participant MQTT as MQTT Broker
+    participant BE as Backend Server
+    participant Redis as Redis Cache
+    participant DB as MongoDB
+    participant API as External APIs
+    
+    %% 시나리오 1: 음성 명령 처리
+    Note over U,API: 시나리오 1: "오늘 날씨 어때?" 음성 명령
+    
+    U->>RPi: "헤이 스피커"
+    activate RPi
+    RPi->>RPi: Wake Word 감지 (Porcupine)
+    RPi->>U: 🔔 띵동 (듣기 시작)
+    U->>RPi: "오늘 날씨 어때?"
+    RPi->>RPi: 음성 녹음 (5초)
+    RPi->>RPi: 오디오 전처리<br/>- 노이즈 제거<br/>- 정규화
+    
+    RPi->>MQTT: Publish: device/{id}/audio<br/>{"audio": "base64...", "metadata": {...}}
+    deactivate RPi
+    
+    MQTT->>BE: Message: audio data
+    activate BE
+    
+    BE->>BE: DeviceMessageHandler.handleMessage()
+    BE->>API: Google STT API<br/>transcribe(audioData)
+    API-->>BE: "오늘 날씨 어때?"
+    
+    BE->>BE: DialogManager.processUserInput()
+    BE->>Redis: GET context:user123:session456
+    Redis-->>BE: null (캐시 미스)
+    
+    BE->>DB: findContext(userId, sessionId)
+    DB-->>BE: null (첫 대화)
+    BE->>BE: createNewContext()
+    BE->>Redis: SET context:user123:session456
+    
+    BE->>API: Dialogflow analyzeIntent()
+    API-->>BE: Intent: weather.query<br/>Entity: {date: "today"}
+    
+    BE->>BE: PluginManager.selectPlugin()
+    BE->>BE: WeatherPlugin.execute()
+    
+    BE->>Redis: GET weather:seoul
+    Redis-->>BE: null (캐시 미스)
+    
+    BE->>API: OpenWeatherMap API
+    API-->>BE: {"temp": 23, "condition": "clear"}
+    
+    BE->>Redis: SET weather:seoul (TTL: 30분)
+    BE->>BE: buildResponse("맑음, 23도")
+    
+    BE->>API: Google TTS API
+    API-->>BE: MP3 audio data
+    
+    BE->>MQTT: Publish: device/{id}/response<br/>{"audio": "...", "text": "..."}
+    deactivate BE
+    
+    MQTT->>RPi: Response message
+    activate RPi
+    RPi->>RPi: Speaker.play_audio()
+    RPi->>U: "오늘 서울은 맑고 23도입니다"
+    deactivate RPi
+    
+    Note over BE,DB: 비동기 작업
+    BE-->>DB: saveDialogHistory()
+    BE-->>MQTT: Publish: analytics/dialog-completed
+    
+    %% 시나리오 2: 프로액티브 대화
+    Note over U,API: 시나리오 2: 아침 인사 (프로액티브)
+    
+    RPi->>RPi: MotionSensor.detect()
+    activate RPi
+    RPi->>MQTT: Publish: device/{id}/event<br/>{"type": "motion", "time": "07:00"}
+    deactivate RPi
+    
+    MQTT->>BE: Motion event
+    activate BE
+    BE->>BE: ProactiveEngine.evaluate()
+    BE->>Redis: GET context:user123:*
+    Redis-->>BE: Context (lastGreeting: yesterday)
+    
+    BE->>BE: Rule: morning_greeting matches!
+    BE->>API: Weather API (for greeting)
+    API-->>BE: Weather data
+    
+    BE->>BE: Generate: "좋은 아침이에요!<br/>오늘은 비가 올 예정이니<br/>우산을 챙기세요"
+    
+    BE->>API: Google TTS
+    API-->>BE: Audio data
+    
+    BE->>MQTT: Publish: device/{id}/proactive<br/>{"audio": "...", "rule": "morning_greeting"}
+    deactivate BE
+    
+    MQTT->>RPi: Proactive message
+    activate RPi
+    RPi->>U: "좋은 아침이에요!..."
+    deactivate RPi
+    
+    %% 시나리오 3: 연속 대화
+    Note over U,API: 시나리오 3: 컨텍스트 활용 연속 대화
+    
+    U->>RPi: "내일은?"
+    activate RPi
+    RPi->>MQTT: Audio data
+    deactivate RPi
+    
+    MQTT->>BE: Audio message
+    activate BE
+    BE->>API: STT
+    API-->>BE: "내일은?"
+    
+    BE->>Redis: GET context:user123:session456
+    Redis-->>BE: Context {lastIntent: "weather.query"}
+    
+    BE->>BE: 컨텍스트 추론<br/>이전: 날씨 질문<br/>→ "내일 날씨"
+    
+    BE->>API: Dialogflow with context
+    API-->>BE: Intent: weather.query<br/>Entity: {date: "tomorrow"}
+    
+    BE->>BE: WeatherPlugin.execute()
+    BE->>API: Weather forecast API
+    API-->>BE: Tomorrow weather
+    
+    BE->>MQTT: Response
+    deactivate BE
+    
+    MQTT->>RPi: Audio response
+    RPi->>U: "내일은 흐리고 18도..."
+    
+    %% 스타일
+    rect rgb(230, 245, 255)
+        Note right of U: 음성 입력 구간
+    end
+    
+    rect rgb(255, 245, 230)
+        Note right of BE: 처리 구간
+    end
+    
+    rect rgb(245, 255, 230)
+        Note right of API: 외부 서비스 구간
+    end

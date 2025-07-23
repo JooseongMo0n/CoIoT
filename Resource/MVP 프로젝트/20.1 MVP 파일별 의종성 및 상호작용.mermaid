@@ -1,0 +1,151 @@
+graph LR
+    %% Backend Java 파일 의존성
+    subgraph "Backend Services (Spring Boot)"
+        subgraph "API Layer"
+            DC[DeviceController.java]
+            WS[WebSocketHandler.java]
+        end
+        
+        subgraph "Core Services"
+            DM[DialogManager.java]
+            CE[ContextEngine.java]
+            PM[PluginManager.java]
+            PE[ProactiveEngine.java]
+        end
+        
+        subgraph "Plugins"
+            WP[WeatherPlugin.java]
+            TP[TimePlugin.java]
+            GP[GreetingPlugin.java]
+            PI[PluginInterface.java]
+        end
+        
+        subgraph "Integration"
+            DS[DialogflowService.java]
+            GST[GoogleSTTService.java]
+            GTT[GoogleTTSService.java]
+            MH[MqttHandler.java]
+            WAC[WeatherApiClient.java]
+        end
+        
+        subgraph "Domain/Models"
+            CTX[Context.java]
+            INT[Intent.java]
+            PR[PluginResponse.java]
+            DR[DialogResponse.java]
+        end
+        
+        subgraph "Repository"
+            CR[ContextRepository.java]
+            UR[UserRepository.java]
+        end
+        
+        subgraph "Config"
+            AC[AppConfig.java]
+            MC[MqttConfig.java]
+            RC[RedisConfig.java]
+        end
+    end
+    
+    %% Raspberry Pi Python 파일 의존성
+    subgraph "Raspberry Pi Client (Python)"
+        subgraph "Main"
+            MA[main.py]
+            AS[AiSpeaker class]
+        end
+        
+        subgraph "Audio"
+            MIC[microphone.py]
+            SPK[speaker.py]
+            WWD[wake_word.py]
+        end
+        
+        subgraph "Sensors"
+            MS[motion_sensor.py]
+            ES[environment_sensor.py]
+        end
+        
+        subgraph "Communication"
+            MQC[mqtt_client.py]
+            WSC[websocket_client.py]
+        end
+        
+        subgraph "Core"
+            DMA[device_manager.py]
+            EH[event_handler.py]
+        end
+        
+        CFG[config.yaml]
+    end
+    
+    %% 파일 간 의존성 (실선)
+    DC --> DM
+    DC --> GST
+    DC --> GTT
+    
+    DM --> CE
+    DM --> PM
+    DM --> DS
+    DM --> PE
+    
+    CE --> CR
+    CE --> CTX
+    
+    PM --> PI
+    PM --> WP
+    PM --> TP
+    PM --> GP
+    
+    WP --> WAC
+    WP --> PR
+    TP --> PR
+    GP --> PR
+    
+    MH --> DM
+    MH --> DC
+    
+    MA --> AS
+    AS --> MIC
+    AS --> SPK
+    AS --> WWD
+    AS --> MS
+    AS --> ES
+    AS --> MQC
+    AS --> DMA
+    AS --> EH
+    AS --> CFG
+    
+    EH --> MQC
+    DMA --> CFG
+    
+    %% 서비스 간 통신 (점선)
+    MQC -.MQTT.-> MH
+    WSC -.WebSocket.-> WS
+    GST -.HTTP.-> DC
+    GTT -.HTTP.-> DC
+    DS -.gRPC.-> DM
+    WAC -.HTTP.-> WP
+    
+    %% 데이터 흐름 표시
+    MIC ==>|Audio Data| AS
+    AS ==>|Base64 Audio| MQC
+    MQC ==>|MQTT Message| MH
+    MH ==>|Dialog Request| DC
+    DC ==>|Process| DM
+    DM ==>|Response| DC
+    DC ==>|Audio Response| MH
+    MH ==>|MQTT Response| MQC
+    MQC ==>|Audio Data| SPK
+    
+    %% 스타일
+    classDef api fill:#e3f2fd,stroke:#1565c0,stroke-width:2px
+    classDef core fill:#fff8e1,stroke:#f9a825,stroke-width:2px
+    classDef plugin fill:#e8f5e9,stroke:#43a047,stroke-width:2px
+    classDef integration fill:#fce4ec,stroke:#e91e63,stroke-width:2px
+    classDef python fill:#fff3e0,stroke:#ef6c00,stroke-width:2px
+    
+    class DC,WS api
+    class DM,CE,PM,PE core
+    class WP,TP,GP,PI plugin
+    class DS,GST,GTT,MH,WAC integration
+    class MA,AS,MIC,SPK,WWD,MS,ES,MQC,WSC,DMA,EH python
